@@ -36,3 +36,44 @@ $working_hours = [
     ['day' => 6, 'opening' => '10:00', 'closing' => '18:00'],
     ['day' => 0, 'opening' => '11:00', 'closing' => '18:00'],
 ];
+```
+
+### Expected Output
+The function will return an array containing today's opening and closing times and grouped working hours for display. For example:
+
+```php
+Array
+(
+    [today] => Array
+        (
+            [opening] => 10:00
+            [closing] => 20:00
+            [status] => open
+            [label] => до 20:00
+        )
+    [working_hours] => Array
+        (
+            [0] => Array
+                (
+                    [days_label] => Пн-Пт
+                    [opening] => 10:00
+                    [closing] => 20:00
+                    [label] => Пн-Пт с 10:00 до 20:00
+                )
+            [1] => Array
+                (
+                    [days_label] => Сб
+                    [opening] => 10:00
+                    [closing] => 18:00
+                    [label] => Сб с 10:00 до 18:00
+                )
+            [2] => Array
+                (
+                    [days_label] => Вс
+                    [opening] => 11:00
+                    [closing] => 18:00
+                    [label] => Вс с 11:00 до 18:00
+                )
+        )
+)
+```
