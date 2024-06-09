@@ -78,22 +78,29 @@ function process_working_hours($working_hours, $exceptions) {
         $result['working_hours'][] = [
             'days_label' => $days_label,
             'ranges' => $ranges,
-            'label' => $days_label . ' from ' . $ranges_label
+            'label' => $days_label . ' from ' . $ranges_label,
+            'ranges_label' => $ranges_label
         ];
     }
 
     // Check for exceptions for today and upcoming exceptions
     $today_exception = null;
     $upcoming_exceptions = [];
-    foreach ($exceptions as $exception_date => $exception_ranges) {
+    foreach ($exceptions as $exception) {
         // Handle recurring exceptions (MM-DD format)
-        if (strlen($exception_date) == 5) {
-            $exception_date = date('Y') . '-' . $exception_date;
+        if (strlen($exception['date']) == 5) {
+            $exception['date'] = date('Y') . '-' . $exception['date'];
         }
-        if ($exception_date == $current_date) {
-            $today_exception = $exception_ranges;
-        } elseif (strtotime($exception_date) >= strtotime($current_date) && strtotime($exception_date) <= strtotime($current_date . ' + 5 days')) {
-            $upcoming_exceptions[$exception_date] = $exception_ranges;
+        if ($exception['date'] == $current_date) {
+            $today_exception = $exception['ranges'];
+        } elseif (strtotime($exception['date']) >= strtotime($current_date) && strtotime($exception['date']) <= strtotime($current_date . ' + 5 days')) {
+            $upcoming_exceptions[$exception['date']] = array( 
+            	'ranges' => $exception['ranges'], 
+            	'message' => $exception['message'],
+            	'ranges_label' => implode(', ', array_map(function($range) {
+		            return $range['opening'] . '-' . $range['closing'];
+		        }, $exception['ranges']))
+        	);
         }
     }
     $result['exceptions'] = $upcoming_exceptions;
@@ -111,25 +118,33 @@ function process_working_hours($working_hours, $exceptions) {
     if ($today_exception !== null) {
         $status = 'closed';
         $label = '';
-        foreach ($today_exception as $range) {
-            $opening = $range['opening'];
-            $closing = $range['closing'];
-            // Check if the current time is within the range
-            if (is_time_in_range($opening, $closing, $current_time)) {
-                $status = 'open';
-                $label = 'until ' . $closing;
-                break;
-            } elseif ($current_time < $opening) {
-                $status = 'closed';
-                $label = 'from ' . $opening;
-                break;
-            }
+        if ( !empty($today_exception) ){
+	        foreach ($today_exception as $range) {
+	            $opening = $range['opening'];
+	            $closing = $range['closing'];
+	            // Check if the current time is within the range
+	            if (is_time_in_range($opening, $closing, $current_time)) {
+	                $status = 'open';
+	                $label = 'until ' . $closing;
+	                break;
+	            } elseif ($current_time < $opening) {
+	                $status = 'closed';
+	                $label = 'from ' . $opening;
+	                break;
+	            }
+	        }
+        } else {
+        	$status = 'closed';
+        	$opening = null;
+        	$closing = null;
         }
+
         $result['today'] = [
             'opening' => $opening,
             'closing' => $closing,
             'status' => $status,
-            'label' => $label
+            'label' => $label,
+            'exception' => true
         ];
     } else {
         // Find the working hours for today
@@ -175,18 +190,41 @@ function process_working_hours($working_hours, $exceptions) {
         $next_opening_day = null;
 
         // First check today's opening hours for upcoming opening time
-        foreach ($today_hours['ranges'] as $range) {
-            if ($current_time < $range['opening']) {
-                $next_opening = $range['opening'];
+        if ( !isset($result['today']['exception']) ){
+	        foreach ($today_hours['ranges'] as $range) {
+	            if ($current_time < $range['opening']) {
+	                $next_opening = $range['opening'];
+	                $next_opening_day = $current_day;
+	                break;
+	            }
+	        }
+        } elseif ($result['today']['opening']) {
+        	if ($current_time < $result['today']['opening']) {
+                $next_opening = $result['today']['opening'];
                 $next_opening_day = $current_day;
-                break;
-            }
+	         }
         }
 
         // If no opening time is found for today, loop through the next 7 days to find the next opening time
         if (!$next_opening) {
+        	$date = new DateTime();
             for ($i = 1; $i <= 7; $i++) {
+            	$date->modify("+1 day");
+            	$next_date = $date->format('Y-m-d');
                 $check_day = ($current_day + $i) % 7;
+                
+                if ( $result['exceptions'] ) {
+		        	if (isset($result['exceptions'][$next_date]) ){
+		        		if ($result['exceptions'][$next_date]['ranges']){
+		        			$next_opening = $result['exceptions'][$next_date]['ranges'][0]['opening'];
+			        		$next_opening_day = ($current_day + 1) % 7;
+			        		break;
+		        		} else {
+		        			continue;	
+		        		}
+		        	}
+		        }
+                
                 foreach ($working_hours as $hours) {
                     if ($hours['day'] == $check_day) {
                         $next_opening = $hours['ranges'][0]['opening'];
@@ -195,7 +233,7 @@ function process_working_hours($working_hours, $exceptions) {
                     }
                 }
             }
-        }
+        } 
 
         // If a next opening time is found, add it to the result
         if ($next_opening && $next_opening_day !== null) {
@@ -218,14 +256,12 @@ $working_hours = [
     ['day' => 4, 'ranges' => [['opening' => '10:00', 'closing' => '20:00']]],
     ['day' => 5, 'ranges' => [['opening' => '10:00', 'closing' => '20:00']]],
     ['day' => 6, 'ranges' => [['opening' => '10:00', 'closing' => '18:00']]],
-    ['day' => 0, 'ranges' => [['opening' => '10:00', 'closing' => '11:20'],['opening' => '12:00', 'closing' => '18:00']]]
+    ['day' => 0, 'ranges' => [['opening' => '10:00', 'closing' => '11:20']]]
 ];
 
 $exceptions = [
-    '2024-11-11' => [['opening' => '09:00', 'closing' => '12:00']],
-    '2024-12-25' => ['message' => 'Merry Christmas!'],
-    '01-01'      => ['message' => 'Happy New Year!'],
-    '06-09'      => [['opening' => '09:00', 'closing' => '12:00'], ['opening' => '13:00', 'closing' => '18:00'], 'message' => 'Some message for this day']
+    ['date' => '01-01', 'ranges' => [], 'message' => 'Happy New Year!'],
+    ['date' => '2024-06-09', 'ranges' => [['opening' => '09:00', 'closing' => '12:00:30'],['opening' => '13:00', 'closing' => '18:00']], 'message' => 'Some message for this day' ]
 ];
 
 print_r(process_working_hours($working_hours, $exceptions));
