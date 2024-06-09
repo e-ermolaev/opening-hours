@@ -46,10 +46,8 @@ $working_hours = [
 ];
 
 $exceptions = [
-    '2024-11-11' => [['opening' => '09:00', 'closing' => '12:00']],
-    '2024-12-25' => ['message' => 'Merry Christmas!'],
-    '01-01'      => ['message' => 'Happy New Year!'],
-    '06-09'      => [['opening' => '09:00', 'closing' => '12:00'], ['opening' => '13:00', 'closing' => '18:00'], 'message' => 'Some message for this day']
+    ['date' => '01-01', 'ranges' => [], 'message' => 'Happy New Year!'],
+    ['date' => '2024-06-09', 'ranges' => [['opening' => '09:00', 'closing' => '12:00:30'],['opening' => '13:00', 'closing' => '18:00']], 'message' => 'Some message for this day' ]
 ];
 
 ```
